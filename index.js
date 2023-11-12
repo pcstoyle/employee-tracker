@@ -1,27 +1,9 @@
-const express = require('express');
 const inquirer = require('inquirer');
-// Import and require mysql2
-const mysql = require('mysql2');
 
+//connect db files
+const connection = require('./db/connection');
+// const databasePrompts = require('./db/index')
 
-const app = express();
-
-// Express middleware
-app.use(express.urlencoded({ extended: false }));
-app.use(express.json());
-
-//Connect to SQL database
-const db = mysql.createConnection(
-    {
-        host: '127.0.0.1',
-        // MySQL username,
-        user: 'root',
-        // TODO: Add MySQL password here
-        password: 'password',
-        database: 'employees_db;'
-    },
-    console.log(`Connected to the employees_db database.`)
-);
 
 //Node prompting user to make table selection out of db  
 const databaseInquiry = [
@@ -33,7 +15,7 @@ const databaseInquiry = [
     },
 ];
 
-
+//results/follow up prompts based on intial selection 
 const addDepartment = [
     {
         type: 'input',
@@ -42,24 +24,7 @@ const addDepartment = [
     },
 ];
 
-const addRole = [
-    {
-        type: 'input',
-        name: 'role',
-        message: 'Enter the name of the role',
-    },
-    {
-        type: 'input',
-        name: 'salary',
-        message: 'Enter salary',
-    },
-    {
-        type: 'list',
-        name: 'roleDept',
-        message: 'Select a department',
-        choices: [],
-    }
-]
+
 
 const addEmp = [
     {
@@ -101,47 +66,121 @@ const updateEmployee = [
     },
 ];
 
-function response(answer) {
-    if (answer.databaseInquiry === 'View all departments') {
-        connection.query('SELECT * FROM departments', function (err, results) {
-            console.log(results);
-        });
-    };
-    
-    
-    
-    if (answer.databaseInquiry === 'View all roles') {
-        connection.query('SELECT * FROM roles', function (err, results) {
-            console.log(results);
-        });
+
+async function response(answer) {
+    //if "view dept/role/emp" is selected
+    if (answer.selection === 'View all departments') {
+       viewDepartments();
     };
 
-    if (answer.databaseInquiry === 'View all employees') {
-        connection.query('SELECT * FROM employee', function (err, results) {
-            console.log(results);
-        });
+    if (answer.selection === 'View all roles') {
+        viewRoles();
     };
 
-    if (answer.databaseInquiry === 'Add a department') {
+    if (answer.selection === 'View all employees') {
+        viewEmployees();
+    };
+
+
+
+    //if "add dept/role/emp" is selected
+    if (answer.selection === 'Add a department') {
         inquirer
-        .prompt 
-        connection.query('SELECT * FROM departments', function (err, results) {
-            console.log(results);
-        });
+            .prompt(addDepartment)
+            .then((answer) => {
+                connection.promise().query("INSERT INTO department(name) VALUES (?)", answer.deptName).then(([response]) => {
+                    if(response.affectedRows > 0) {
+                        viewDepartments();
+                    }
+                    else {
+                        console.error("Failed to add department");
+                        init();
+                    }
+                })
+            })
     };
 
-    if (answer.databaseInquiry === 'Add a role') {
-        connection.query('SELECT * FROM departments', function (err, results) {
-            console.log(results);
-        });
+    if (answer.selection === 'Add a role') {
+        const [departments] = await connection.promise().query("SELECT * FROM department")
+        const deptArray = departments.map(department => ({name: department.name, value: department.id}))
+        const addRole = [
+            {
+                type: 'input',
+                name: 'role',
+                message: 'Enter the name of the role',
+            },
+            {
+                type: 'input',
+                name: 'salary',
+                message: 'Enter salary',
+            },
+            {
+                type: 'list',
+                name: 'roleDept',
+                message: 'Select a department',
+                choices: deptArray,
+            }
+        ]
+        inquirer
+            .prompt(addRole)
+            .then((answer) => {
+            const roleObj = {role: answer.role, salary: answer.salary, role_id: answer.roleDept};
+            connection.promise().query("INSERT INTO role SET ?", roleObj).then(([response]) => {
+                if(response.affectedRows > 0) {
+                    viewRoles();
+                }
+                else {
+                    console.error("Failed to add role");
+                    init();
+                }
+            })
+            })
     };
 
+    if (answer.selection === 'Add an employee') {
+        inquirer
+            .prompt(addEmp)
+            .then((answer) => {
+            })
+    };
+
+    //if "update emp role" is selected 
+    if (answer.selection === 'Update employee role') {
+        inquirer
+            .prompt(updateEmployee)
+            .then((answer) => {
+
+            })
+    };
 };
 
-const init () => {
-    databaseInquiry()
-        .then
-        .catch((err) => console.error(err));
+function viewDepartments() {
+    connection.query('SELECT * FROM department', function (err, results) {
+        console.table(results);
+        init();
+    });
+}
+
+function viewRoles() {
+    connection.query('SELECT role.id, role.role, role.salary, department.name AS department FROM role LEFT JOIN department ON role.department=department.id;', function (err, results) {
+        console.table(results);
+        init();
+    });
+}
+
+function viewEmployees() {
+    connection.query('SELECT * FROM employee', function (err, results) {
+        console.table(results);
+        init();
+    });
+}
+
+function init() {
+    inquirer
+        .prompt(databaseInquiry)
+        .then((answer) => {
+            response(answer);
+        });
 };
 
 init();
