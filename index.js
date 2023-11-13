@@ -10,7 +10,7 @@ const databaseInquiry = [
     {
         type: 'list',
         name: 'selection',
-        choices: ["View all departments", "View all roles", "View all employees", "Add a department", "Add a role", "Add an employee", "Update employee role"],
+        choices: ["View all departments", "View all roles", "View all employees", "Add a department", "Add a role", "Add an employee"],
         message: 'Please make a selection.'
     },
 ];
@@ -97,7 +97,7 @@ async function response(answer) {
         inquirer
             .prompt(addRole)
             .then((answer) => {
-            const roleObj = {role: answer.role, salary: answer.salary, role_id: answer.roleDept};
+            const roleObj = {role: answer.role, salary: answer.salary, role: answer.roleDept};
             connection.promise().query("INSERT INTO role SET ?", roleObj).then(([response]) => {
                 if(response.affectedRows > 0) {
                     viewRoles();
@@ -111,8 +111,11 @@ async function response(answer) {
     };
 
     if (answer.selection === 'Add an employee') {
-        const [employees] = await connection.promise().query("SELECT * FROM employee")
-        const employeeArr = employees.map(employee => ({firstName: employee.first_name, lastName: employee.last_name, role: employee.role, manager: employee.manager}))
+        // const [departments] = await connection.promise().query
+        // ("SELECT * FROM department")
+        // const deptArr = departments.map(department => ({name: department.name, value: department.id}))
+        const [roles] = await connection.promise().query("SELECT * FROM role")
+        const roleArr = roles.map(role => ({name: role.role, value: role.id}))
         const addEmp = [
             {
                 type: 'input',
@@ -128,19 +131,13 @@ async function response(answer) {
                 type: 'list',
                 name: 'empRole',
                 message: 'Select the employees role.',
-                choices: employeeArr,
-            },
-            {
-                type: 'list',
-                name: 'empManager',
-                message: 'Select the employees manager.',
-                choices: employeeArr,
+                choices: roleArr,
             },
         ]
         inquirer
             .prompt(addEmp)
             .then((answer) => {
-                const employeeObj = {name: answer.concat(empFirstName, empLastName), role: answer.empRole, manager: answer.empManager};
+                const employeeObj = {first_name: answer.empFirstName, last_name: answer.empLastName, role_id: answer.empRole};
                 connection.promise().query("INSERT INTO employee SET ?", employeeObj).then(([response]) => {
                     if(response.affectedRows > 0) {
                         viewEmployees();
